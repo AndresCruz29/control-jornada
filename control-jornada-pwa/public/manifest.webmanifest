@@ -1,0 +1,9 @@
+{
+  "name": "Control de Jornada",
+  "short_name": "Jornada",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#12151B",
+  "theme_color": "#12151B",
+  "description": "Control personal de entrada, salida, descansos y ba\u00f1o."
+}
