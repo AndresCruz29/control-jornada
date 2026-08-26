@@ -277,6 +277,8 @@ function DayCard({dateStr,events=[],isToday,now,expanded,onToggle}){
 
 createRoot(document.getElementById("root")).render(<App/>);
 
-if("serviceWorker" in navigator){
-  window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js"));
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/control-jornada/sw.js");
+  });
 }
