@@ -1,8 +1,7 @@
-const CACHE = "control-jornada-v2";
-
+const CACHE_NAME = "control-jornada-v3";
 const BASE = "/control-jornada/";
 
-const CORE = [
+const APP_SHELL = [
   BASE,
   BASE + "index.html",
   BASE + "manifest.webmanifest"
@@ -10,10 +9,10 @@ const CORE = [
 
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(CORE))
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(APP_SHELL))
+      .then(() => self.skipWaiting())
   );
-
-  self.skipWaiting();
 });
 
 self.addEventListener("activate", event => {
@@ -21,42 +20,46 @@ self.addEventListener("activate", event => {
     caches.keys().then(keys =>
       Promise.all(
         keys
-          .filter(key => key !== CACHE)
+          .filter(key => key !== CACHE_NAME)
           .map(key => caches.delete(key))
       )
-    )
+    ).then(() => self.clients.claim())
   );
-
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
 
+  const request = event.request;
+
   event.respondWith(
-    caches.match(event.request).then(cached => {
+    caches.match(request).then(cached => {
       if (cached) {
         return cached;
       }
 
-      return fetch(event.request)
+      return fetch(request)
         .then(response => {
-          if (
-            response &&
-            response.status === 200 &&
-            response.type === "basic"
-          ) {
-            const copy = response.clone();
-
-            caches.open(CACHE).then(cache => {
-              cache.put(event.request, copy);
-            });
+          if (!response || response.status !== 200) {
+            return response;
           }
+
+          const copy = response.clone();
+
+          caches.open(CACHE_NAME)
+            .then(cache => cache.put(request, copy));
 
           return response;
         })
         .catch(() => {
-          return caches.match(BASE + "index.html");
+          if (request.mode === "navigate") {
+            return caches.match(BASE + "index.html");
+          }
+
+          return new Response("", {
+            status: 503,
+            statusText: "Offline"
+          });
         });
     })
   );
