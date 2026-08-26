@@ -1,4 +1,4 @@
-const CACHE_NAME = "control-jornada-v4";
+const CACHE_NAME = "control-jornada-v5";
 const BASE = "/control-jornada/";
 
 self.addEventListener("install", (event) => {
