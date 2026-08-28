@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import * as XLSX from "xlsx";
+
 import {
   LogIn,
   LogOut,
@@ -11,7 +13,8 @@ import {
   ChevronDown,
   ChevronRight,
   CalendarDays,
-  AlertTriangle
+  AlertTriangle,
+  Download
 } from "lucide-react";
 
 import "./style.css";
@@ -125,9 +128,12 @@ const dateStrOf = d =>
 
 
 function labelForDate(dateStr) {
-  const [y, m, d] = dateStr.split("-").map(Number);
 
-  const dt = new Date(y, m - 1, d);
+  const [y, m, d] =
+    dateStr.split("-").map(Number);
+
+  const dt =
+    new Date(y, m - 1, d);
 
   const dias = [
     "domingo",
@@ -160,11 +166,34 @@ function labelForDate(dateStr) {
     dowShort: dias[dt.getDay()].slice(0, 3),
     dt
   };
+
+}
+
+
+function monthName(monthIndex) {
+
+  return [
+    "Enero",
+    "Febrero",
+    "Marzo",
+    "Abril",
+    "Mayo",
+    "Junio",
+    "Julio",
+    "Agosto",
+    "Septiembre",
+    "Octubre",
+    "Noviembre",
+    "Diciembre"
+  ][monthIndex];
+
 }
 
 
 function endOfDayTs(dateStr) {
-  const [y, m, d] = dateStr.split("-").map(Number);
+
+  const [y, m, d] =
+    dateStr.split("-").map(Number);
 
   return new Date(
     y,
@@ -175,33 +204,42 @@ function endOfDayTs(dateStr) {
     59,
     999
   ).getTime();
+
 }
 
 
 function getSchedule(dt) {
-  const dow = dt.getDay();
+
+  const dow =
+    dt.getDay();
 
   if (dow >= 1 && dow <= 4) {
+
     return {
       start: "07:00",
       end: "17:00",
       hours: 10
     };
+
   }
 
   if (dow === 5) {
+
     return {
       start: "07:00",
       end: "15:00",
       hours: 8
     };
+
   }
 
   return null;
+
 }
 
 
 function formatClock(ts) {
+
   return new Date(ts).toLocaleTimeString(
     "es-CR",
     {
@@ -211,55 +249,82 @@ function formatClock(ts) {
       hour12: true
     }
   );
+
+}
+
+
+function formatClockShort(ts) {
+
+  if (!ts) return "—";
+
+  return new Date(ts).toLocaleTimeString(
+    "es-CR",
+    {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    }
+  );
+
 }
 
 
 function formatDuration(ms) {
-  ms = Math.max(0, ms || 0);
 
-  const sec = Math.floor(ms / 1000);
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
+  ms =
+    Math.max(0, ms || 0);
+
+  const sec =
+    Math.floor(ms / 1000);
+
+  const h =
+    Math.floor(sec / 3600);
+
+  const m =
+    Math.floor(
+      (sec % 3600) / 60
+    );
 
   return `${h}h ${pad(m)}m`;
+
 }
 
 
-/*
-  Cronómetro exacto con segundos.
-  Se utiliza mientras estás en:
-  - descanso
-  - baño
-  - otro
-*/
 function formatTimer(ms) {
-  ms = Math.max(0, ms || 0);
 
-  const totalSeconds = Math.floor(ms / 1000);
+  ms =
+    Math.max(0, ms || 0);
 
-  const hours = Math.floor(totalSeconds / 3600);
+  const totalSeconds =
+    Math.floor(ms / 1000);
 
-  const minutes = Math.floor(
-    (totalSeconds % 3600) / 60
-  );
+  const hours =
+    Math.floor(totalSeconds / 3600);
 
-  const seconds = totalSeconds % 60;
+  const minutes =
+    Math.floor(
+      (totalSeconds % 3600) / 60
+    );
+
+  const seconds =
+    totalSeconds % 60;
 
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+
 }
 
 
-function computeStats(events, nowTs) {
+function computeStats(events, nowTs, dateStr = null) {
 
-  const sorted = [...events].sort(
-    (a, b) => a.ts - b.ts
-  );
+  const sorted =
+    [...events].sort(
+      (a, b) => a.ts - b.ts
+    );
 
   let state = "fuera";
 
   let lastTs = null;
 
-  let workedMs = 0;
   let breakMs = 0;
   let bathMs = 0;
   let otherMs = 0;
@@ -272,26 +337,29 @@ function computeStats(events, nowTs) {
 
     if (lastTs !== null) {
 
-      const delta = Math.max(
-        0,
-        ev.ts - lastTs
-      );
+      const delta =
+        Math.max(
+          0,
+          ev.ts - lastTs
+        );
 
 
-      if (state === "trabajando") {
-        workedMs += delta;
-      }
+      if (state === "pausa") {
 
-      else if (state === "pausa") {
         breakMs += delta;
+
       }
 
       else if (state === "bano") {
+
         bathMs += delta;
+
       }
 
       else if (state === "otro") {
+
         otherMs += delta;
+
       }
 
     }
@@ -307,7 +375,6 @@ function computeStats(events, nowTs) {
 
     }
 
-
     else if (ev.type === "salida") {
 
       state = "fuera";
@@ -315,13 +382,11 @@ function computeStats(events, nowTs) {
 
     }
 
-
     else if (ev.type === "pausa_inicio") {
 
       state = "pausa";
 
     }
-
 
     else if (ev.type === "pausa_fin") {
 
@@ -329,13 +394,11 @@ function computeStats(events, nowTs) {
 
     }
 
-
     else if (ev.type === "bano_inicio") {
 
       state = "bano";
 
     }
-
 
     else if (ev.type === "bano_fin") {
 
@@ -343,13 +406,11 @@ function computeStats(events, nowTs) {
 
     }
 
-
     else if (ev.type === "otro_inicio") {
 
       state = "otro";
 
     }
-
 
     else if (ev.type === "otro_fin") {
 
@@ -364,8 +425,8 @@ function computeStats(events, nowTs) {
 
 
   /*
-    Si actualmente hay una actividad activa,
-    seguimos sumando el tiempo hasta ahora.
+    Si el día sigue activo, las actividades
+    informativas continúan contando hasta nowTs.
   */
 
   if (
@@ -373,19 +434,14 @@ function computeStats(events, nowTs) {
     lastTs !== null
   ) {
 
-    const delta = Math.max(
-      0,
-      nowTs - lastTs
-    );
+    const delta =
+      Math.max(
+        0,
+        nowTs - lastTs
+      );
 
 
-    if (state === "trabajando") {
-
-      workedMs += delta;
-
-    }
-
-    else if (state === "pausa") {
+    if (state === "pausa") {
 
       breakMs += delta;
 
@@ -406,12 +462,97 @@ function computeStats(events, nowTs) {
   }
 
 
+  /*
+    El tiempo trabajado es TODO el tiempo
+    entre la primera entrada y la salida.
+
+    Descanso, baño y otro NO descuentan.
+  */
+
+  let workedMs = 0;
+
+  if (entradaTs !== null) {
+
+    const endTs =
+      salidaTs !== null
+        ? salidaTs
+        : nowTs;
+
+    workedMs =
+      Math.max(
+        0,
+        endTs - entradaTs
+      );
+
+  }
+
+
+  let extraMs = 0;
+
+  const isClosed =
+    salidaTs !== null;
+
+
+  /*
+    Las horas extra solo se confirman
+    cuando existe una salida.
+  */
+
+  if (
+    isClosed &&
+    entradaTs !== null &&
+    dateStr
+  ) {
+
+    const [, month, day] =
+      dateStr.split("-").map(Number);
+
+    const [year] =
+      dateStr.split("-").map(Number);
+
+    const dt =
+      new Date(
+        year,
+        month - 1,
+        day
+      );
+
+    const schedule =
+      getSchedule(dt);
+
+    if (schedule) {
+
+      extraMs =
+        Math.max(
+          workedMs -
+          schedule.hours * 3600000,
+          0
+        );
+
+    }
+
+    else {
+
+      /*
+        Sábado y domingo:
+        todo cuenta como extra.
+      */
+
+      extraMs =
+        workedMs;
+
+    }
+
+  }
+
+
   return {
     state,
     workedMs,
     breakMs,
     bathMs,
     otherMs,
+    extraMs,
     entradaTs,
     salidaTs,
     events: sorted
@@ -445,7 +586,8 @@ function feedback(type = "normal") {
     if (!Ctx) return;
 
 
-    const ctx = new Ctx();
+    const ctx =
+      new Ctx();
 
     const osc =
       ctx.createOscillator();
@@ -455,22 +597,16 @@ function feedback(type = "normal") {
 
 
     const freq = {
-
       entrada: 720,
       salida: 420,
-
       pausa_inicio: 520,
       pausa_fin: 620,
-
       bano_inicio: 500,
       bano_fin: 600,
-
       otro_inicio: 540,
       otro_fin: 650,
-
       undo: 300,
       normal: 560
-
     }[type] || 560;
 
 
@@ -495,16 +631,13 @@ function feedback(type = "normal") {
 
 
     osc.connect(gain);
-
     gain.connect(ctx.destination);
-
 
     osc.start();
 
     osc.stop(
       ctx.currentTime + 0.14
     );
-
 
     osc.addEventListener(
       "ended",
@@ -560,6 +693,278 @@ function getIndex() {
 }
 
 
+/*
+  Genera todos los días entre start y end.
+*/
+function getDatesInRange(start, end) {
+
+  const dates = [];
+
+  const current =
+    new Date(
+      start.getFullYear(),
+      start.getMonth(),
+      start.getDate()
+    );
+
+  while (current <= end) {
+
+    dates.push(
+      dateStrOf(current)
+    );
+
+    current.setDate(
+      current.getDate() + 1
+    );
+
+  }
+
+  return dates;
+
+}
+
+
+function exportQuincena(quincena) {
+
+  const now =
+    new Date();
+
+  const year =
+    now.getFullYear();
+
+  const month =
+    now.getMonth();
+
+  const lastDay =
+    new Date(
+      year,
+      month + 1,
+      0
+    ).getDate();
+
+
+  const startDay =
+    quincena === 1
+      ? 1
+      : 16;
+
+  const endDay =
+    quincena === 1
+      ? 15
+      : lastDay;
+
+
+  const start =
+    new Date(
+      year,
+      month,
+      startDay
+    );
+
+  const end =
+    new Date(
+      year,
+      month,
+      endDay
+    );
+
+
+  const dates =
+    getDatesInRange(
+      start,
+      end
+    );
+
+
+  const resumenRows = [];
+
+  const marcajesRows = [];
+
+
+  let totalWorked = 0;
+  let totalExtra = 0;
+  let totalBreak = 0;
+
+
+  for (const dateStr of dates) {
+
+    const events =
+      getEvents(dateStr);
+
+    const lbl =
+      labelForDate(dateStr);
+
+    const schedule =
+      getSchedule(lbl.dt);
+
+    const stats =
+      computeStats(
+        events,
+        endOfDayTs(dateStr),
+        dateStr
+      );
+
+
+    const missingExit =
+      events.length > 0 &&
+      stats.entradaTs !== null &&
+      stats.salidaTs === null;
+
+
+    let estado;
+
+    if (missingExit) {
+
+      estado =
+        "Sin marca de salida";
+
+    }
+
+    else if (!events.length) {
+
+      estado =
+        schedule
+          ? "Sin marcajes"
+          : "Sin jornada";
+
+    }
+
+    else {
+
+      estado =
+        "Cerrado";
+
+    }
+
+
+    resumenRows.push({
+      Fecha: `${pad(lbl.dt.getDate())}/${pad(lbl.dt.getMonth() + 1)}/${lbl.dt.getFullYear()}`,
+      Día: lbl.dow,
+      Entrada: formatClockShort(stats.entradaTs),
+      Salida: formatClockShort(stats.salidaTs),
+      "Total trabajado": events.length ? formatDuration(stats.workedMs) : "—",
+      "Horas extras": missingExit ? "—" : formatDuration(stats.extraMs),
+      Descanso: events.length ? formatDuration(stats.breakMs) : "—",
+      Baño: events.length ? formatDuration(stats.bathMs) : "—",
+      Otro: events.length ? formatDuration(stats.otherMs) : "—",
+      Estado: estado
+    });
+
+
+    if (!missingExit) {
+
+      totalWorked +=
+        stats.workedMs;
+
+      totalExtra +=
+        stats.extraMs;
+
+    }
+
+
+    totalBreak +=
+      stats.breakMs;
+
+
+    for (const ev of stats.events) {
+
+      marcajesRows.push({
+        Fecha: `${pad(lbl.dt.getDate())}/${pad(lbl.dt.getMonth() + 1)}/${lbl.dt.getFullYear()}`,
+        Día: lbl.dow,
+        Hora: formatClock(ev.ts),
+        Evento:
+          EVENT_META[ev.type]?.label ||
+          ev.type
+      });
+
+    }
+
+  }
+
+
+  resumenRows.push({
+    Fecha: "TOTALES",
+    Día: "",
+    Entrada: "",
+    Salida: "",
+    "Total trabajado": formatDuration(totalWorked),
+    "Horas extras": formatDuration(totalExtra),
+    Descanso: formatDuration(totalBreak),
+    Baño: "",
+    Otro: "",
+    Estado: ""
+  });
+
+
+  const workbook =
+    XLSX.utils.book_new();
+
+
+  const resumenSheet =
+    XLSX.utils.json_to_sheet(
+      resumenRows
+    );
+
+  const marcajesSheet =
+    XLSX.utils.json_to_sheet(
+      marcajesRows.length
+        ? marcajesRows
+        : [{
+            Fecha: "",
+            Día: "",
+            Hora: "",
+            Evento: "Sin marcajes en esta quincena"
+          }]
+    );
+
+
+  resumenSheet["!cols"] = [
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 20 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 22 }
+  ];
+
+
+  marcajesSheet["!cols"] = [
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 16 },
+    { wch: 22 }
+  ];
+
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    resumenSheet,
+    "Resumen"
+  );
+
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    marcajesSheet,
+    "Marcajes"
+  );
+
+
+  const fileName =
+    `Control_Jornada_${year}-${pad(month + 1)}_Quincena_${quincena}.xlsx`;
+
+
+  XLSX.writeFile(
+    workbook,
+    fileName
+  );
+
+}
+
 
 function App() {
 
@@ -585,7 +990,8 @@ function App() {
     useState(false);
 
 
-  const saving = useRef(false);
+  const saving =
+    useRef(false);
 
 
   const todayStr =
@@ -594,19 +1000,16 @@ function App() {
     );
 
 
-  /*
-    Actualiza el reloj y los cronómetros
-    cada segundo.
-  */
-
   useEffect(() => {
 
-    const t = setInterval(
-      () => setNow(Date.now()),
-      1000
-    );
+    const t =
+      setInterval(
+        () => setNow(Date.now()),
+        1000
+      );
 
-    return () => clearInterval(t);
+    return () =>
+      clearInterval(t);
 
   }, []);
 
@@ -667,17 +1070,13 @@ function App() {
     }, []);
 
 
-
   const punch = (type) => {
 
     if (saving.current) return;
 
-
     saving.current = true;
 
-
     feedback(type);
-
 
     saveToday([
       ...todayEvents,
@@ -687,7 +1086,6 @@ function App() {
       }
     ]);
 
-
     setTimeout(
       () => saving.current = false,
       300
@@ -696,33 +1094,26 @@ function App() {
   };
 
 
-
   const confirmUndoAction = () => {
 
     if (!todayEvents.length) return;
 
-
     feedback("undo");
-
 
     saveToday(
       todayEvents.slice(0, -1)
     );
-
 
     setConfirmUndo(false);
 
   };
 
 
-
   useEffect(() => {
 
     if (tab !== "historial") return;
 
-
     const cache = {};
-
 
     for (const d of index) {
 
@@ -731,17 +1122,16 @@ function App() {
 
     }
 
-
     setHistoryCache(cache);
 
   }, [tab, index]);
 
 
-
   const stats =
     computeStats(
       todayEvents,
-      now
+      now,
+      todayStr
     );
 
 
@@ -812,40 +1202,24 @@ function App() {
 
 
   /*
-    IMPORTANTE:
-
-    Todo esto descuenta del restante:
-
-    - tiempo trabajado
-    - descanso
-    - baño
-    - otro
+    Descanso, baño y otro ya NO descuentan.
   */
 
   const restanteMs =
     scheduledMs === null
+
       ? null
+
       : Math.max(
-
-          scheduledMs
-
-          - stats.workedMs
-          - stats.breakMs
-          - stats.bathMs
-          - stats.otherMs,
-
+          scheduledMs -
+          stats.workedMs,
           0
-
         );
 
 
   const lastEvent =
     todayEvents.at(-1);
 
-
-  /*
-    Cronómetro de la actividad actual.
-  */
 
   const activeTimer =
 
@@ -862,11 +1236,23 @@ function App() {
       : null;
 
 
+  const currentMonth =
+    new Date(now).getMonth();
+
+  const currentYear =
+    new Date(now).getFullYear();
+
+  const currentLastDay =
+    new Date(
+      currentYear,
+      currentMonth + 1,
+      0
+    ).getDate();
+
 
   return (
 
     <div className="app">
-
 
       <header>
 
@@ -874,14 +1260,12 @@ function App() {
 
           <div className="date">
 
-            {dateLabel.dow},
-            {" "}
+            {dateLabel.dow},{" "}
             {dateLabel.full}
 
           </div>
 
         </div>
-
 
         <div className="schedule">
 
@@ -896,7 +1280,6 @@ function App() {
       </header>
 
 
-
       <div className="tabs">
 
         <button
@@ -905,7 +1288,6 @@ function App() {
               ? "active"
               : ""
           }
-
           onClick={() =>
             setTab("hoy")
           }
@@ -918,14 +1300,12 @@ function App() {
         </button>
 
 
-
         <button
           className={
             tab === "historial"
               ? "active"
               : ""
           }
-
           onClick={() =>
             setTab("historial")
           }
@@ -940,7 +1320,6 @@ function App() {
       </div>
 
 
-
       {
         tab === "hoy"
 
@@ -948,9 +1327,7 @@ function App() {
 
           <main>
 
-
             <section className="live">
-
 
               <div
                 className={
@@ -967,7 +1344,6 @@ function App() {
               </div>
 
 
-
               <div
                 className={
                   `status ${status.ramp}`
@@ -981,23 +1357,22 @@ function App() {
               </div>
 
 
-
               {
                 activeTimer !== null && (
 
                   <div className="activity-timer">
 
-
                     <span>
-
                       Tiempo transcurrido
-
                     </span>
-
 
                     <strong className="mono">
 
-                      {formatTimer(activeTimer)}
+                      {
+                        formatTimer(
+                          activeTimer
+                        )
+                      }
 
                     </strong>
 
@@ -1006,9 +1381,7 @@ function App() {
                 )
               }
 
-
             </section>
-
 
 
             <button
@@ -1039,12 +1412,9 @@ function App() {
 
               {
                 canEntrada
-
                   ? <LogIn size={20}/>
-
                   : <LogOut size={20}/>
               }
-
 
               {
                 canEntrada
@@ -1053,7 +1423,6 @@ function App() {
               }
 
             </button>
-
 
 
             {
@@ -1084,9 +1453,7 @@ function App() {
             }
 
 
-
             <div className="secondary">
-
 
               <button
 
@@ -1095,9 +1462,7 @@ function App() {
                   punch(
 
                     canPausaFin
-
                       ? "pausa_fin"
-
                       : "pausa_inicio"
 
                   )
@@ -1115,14 +1480,11 @@ function App() {
 
                 {
                   canPausaFin
-
                     ? "Terminar descanso"
-
                     : "Iniciar descanso"
                 }
 
               </button>
-
 
 
               <button
@@ -1132,9 +1494,7 @@ function App() {
                   punch(
 
                     canBanoFin
-
                       ? "bano_fin"
-
                       : "bano_inicio"
 
                   )
@@ -1152,14 +1512,11 @@ function App() {
 
                 {
                   canBanoFin
-
                     ? "Terminar baño"
-
                     : "Ir al baño"
                 }
 
               </button>
-
 
 
               <button
@@ -1169,9 +1526,7 @@ function App() {
                   punch(
 
                     canOtroFin
-
                       ? "otro_fin"
-
                       : "otro_inicio"
 
                   )
@@ -1189,129 +1544,99 @@ function App() {
 
                 {
                   canOtroFin
-
                     ? "Terminar otro"
-
                     : "Otro"
                 }
 
               </button>
 
-
             </div>
-
 
 
             <div className="summary">
 
-
               <Stat
-
                 label="Trabajado hoy"
-
                 value={
                   formatDuration(
                     stats.workedMs
                   )
                 }
-
               />
 
 
-
               <Stat
-
                 label={
                   restanteMs !== null
-
                     ? "Restante de jornada"
-
                     : "Sin jornada programada"
                 }
-
                 value={
                   restanteMs !== null
-
                     ? formatDuration(restanteMs)
-
                     : "—"
                 }
-
               />
 
 
+              <Stat
+                label="Horas extras"
+                value={
+                  stats.salidaTs !== null
+                    ? formatDuration(stats.extraMs)
+                    : "—"
+                }
+              />
+
 
               <Stat
-
                 label="Descansos"
-
                 value={
                   formatDuration(
                     stats.breakMs
                   )
                 }
-
                 small
-
               />
 
 
-
               <Stat
-
                 label="Baño"
-
                 value={
                   formatDuration(
                     stats.bathMs
                   )
                 }
-
                 small
-
               />
 
 
-
               <Stat
-
                 label="Otro"
-
                 value={
                   formatDuration(
                     stats.otherMs
                   )
                 }
-
                 small
-
               />
-
 
             </div>
 
 
-
             <section className="timeline-section">
-
 
               <div className="section-title">
 
-
                 <span>
-
                   Marcajes de hoy
-
                 </span>
-
 
                 {
                   todayEvents.length > 0 && (
 
                     <button
-
                       className="undo"
-
                       onClick={() =>
                         setConfirmUndo(true)
                       }
@@ -1326,17 +1651,13 @@ function App() {
                   )
                 }
 
-
               </div>
-
 
 
               {
                 todayEvents.length === 0
 
-                  ?
-
-                  <EmptyToday/>
+                  ? <EmptyToday/>
 
                   :
 
@@ -1345,25 +1666,64 @@ function App() {
                   />
               }
 
-
             </section>
-
 
           </main>
 
 
           :
 
-
           <main className="history">
+
+            <section className="export-section">
+
+              <div className="export-title">
+
+                <Download size={18}/>
+
+                <div>
+
+                  <strong>
+                    Exportar Excel
+                  </strong>
+
+                  <small>
+                    {monthName(currentMonth)} {currentYear}
+                  </small>
+
+                </div>
+
+              </div>
+
+
+              <div className="export-buttons">
+
+                <button
+                  onClick={() =>
+                    exportQuincena(1)
+                  }
+                >
+                  1 – 15
+                </button>
+
+
+                <button
+                  onClick={() =>
+                    exportQuincena(2)
+                  }
+                >
+                  16 – {currentLastDay}
+                </button>
+
+              </div>
+
+            </section>
 
 
             {
               index.length === 0
 
-                ?
-
-                <EmptyHistory/>
+                ? <EmptyHistory/>
 
                 :
 
@@ -1377,9 +1737,7 @@ function App() {
 
                     events={
                       d === todayStr
-
                         ? todayEvents
-
                         : historyCache[d]
                     }
 
@@ -1407,10 +1765,8 @@ function App() {
                 ))
             }
 
-
           </main>
       }
-
 
 
       {
@@ -1425,7 +1781,6 @@ function App() {
             }
           >
 
-
             <div
 
               className="modal"
@@ -1435,7 +1790,6 @@ function App() {
               }
             >
 
-
               <div className="modal-icon">
 
                 <Undo2 size={20}/>
@@ -1444,9 +1798,7 @@ function App() {
 
 
               <h2>
-
                 ¿Deshacer último marcaje?
-
               </h2>
 
 
@@ -1469,9 +1821,7 @@ function App() {
 
                       </strong>
 
-
                       <br/>
-
 
                       <span className="mono">
 
@@ -1491,9 +1841,7 @@ function App() {
               </p>
 
 
-
               <div className="modal-actions">
-
 
                 <button
 
@@ -1501,11 +1849,8 @@ function App() {
                     setConfirmUndo(false)
                   }
                 >
-
                   Cancelar
-
                 </button>
-
 
 
                 <button
@@ -1516,30 +1861,23 @@ function App() {
                     confirmUndoAction
                   }
                 >
-
                   Sí, deshacer
-
                 </button>
-
 
               </div>
 
-
             </div>
-
 
           </div>
 
         )
       }
 
-
     </div>
 
   );
 
 }
-
 
 
 function Stat({
@@ -1553,11 +1891,8 @@ function Stat({
     <div className="stat">
 
       <div>
-
         {label}
-
       </div>
-
 
       <strong
         className={
@@ -1568,9 +1903,7 @@ function Stat({
           }`
         }
       >
-
         {value}
-
       </strong>
 
     </div>
@@ -1580,7 +1913,6 @@ function Stat({
 }
 
 
-
 function EmptyToday() {
 
   return (
@@ -1588,16 +1920,11 @@ function EmptyToday() {
     <div className="empty">
 
       <div>
-
         Aún no has marcado nada hoy.
-
       </div>
 
-
       <small>
-
         Toca “Marcar entrada” para empezar tu jornada.
-
       </small>
 
     </div>
@@ -1605,7 +1932,6 @@ function EmptyToday() {
   );
 
 }
-
 
 
 function EmptyHistory() {
@@ -1616,19 +1942,13 @@ function EmptyHistory() {
 
       <CalendarDays size={24}/>
 
-
       <div>
-
         Todavía no tienes días registrados.
-
       </div>
 
-
       <small>
-
         Cuando marques tu primera entrada,
         aparecerá aquí.
-
       </small>
 
     </div>
@@ -1636,7 +1956,6 @@ function EmptyHistory() {
   );
 
 }
-
 
 
 function TimelineList({ events }) {
@@ -1669,19 +1988,16 @@ function TimelineList({ events }) {
                 key={`${ev.ts}-${i}`}
               >
 
-
                 <div
 
                   className="event-icon"
 
                   style={{
-
                     background:
                       ramp.fill,
 
                     color:
                       ramp.text
-
                   }}
                 >
 
@@ -1691,9 +2007,7 @@ function TimelineList({ events }) {
 
 
                 <span>
-
                   {meta.label}
-
                 </span>
 
 
@@ -1706,7 +2020,6 @@ function TimelineList({ events }) {
                   }
 
                 </time>
-
 
               </div>
 
@@ -1722,7 +2035,6 @@ function TimelineList({ events }) {
 }
 
 
-
 function DayCard({
   dateStr,
   events = [],
@@ -1735,22 +2047,16 @@ function DayCard({
   const lbl =
     labelForDate(dateStr);
 
-
   const schedule =
     getSchedule(lbl.dt);
 
-
   const stats =
     computeStats(
-
       events,
-
       isToday
-
         ? now
-
-        : endOfDayTs(dateStr)
-
+        : endOfDayTs(dateStr),
+      dateStr
     );
 
 
@@ -1764,8 +2070,17 @@ function DayCard({
 
     &&
 
-    stats.state !== "fuera";
+    stats.entradaTs !== null
 
+    &&
+
+    stats.salidaTs === null;
+
+
+  const displayExtra =
+    missingExit
+      ? null
+      : stats.extraMs;
 
 
   return (
@@ -1785,7 +2100,6 @@ function DayCard({
       }
     >
 
-
       <button
 
         className="day-head"
@@ -1793,21 +2107,15 @@ function DayCard({
         onClick={onToggle}
       >
 
-
         <div className="day-left">
-
 
           {
             expanded
-
               ? <ChevronDown size={16}/>
-
               : <ChevronRight size={16}/>
           }
 
-
           <div>
-
 
             <strong>
 
@@ -1817,9 +2125,11 @@ function DayCard({
 
               {
                 isToday && (
+
                   <em>
                     {" "}· hoy
                   </em>
+
                 )
               }
 
@@ -1840,16 +2150,12 @@ function DayCard({
               )
             }
 
-
           </div>
-
 
         </div>
 
 
-
         <div className="day-total">
-
 
           <strong className="mono">
 
@@ -1860,7 +2166,6 @@ function DayCard({
             }
 
           </strong>
-
 
 
           {
@@ -1881,29 +2186,26 @@ function DayCard({
               <small>
 
                 {
-                  stats.state === "fuera"
-
+                  stats.salidaTs !== null
+                    ? `Extra: ${formatDuration(displayExtra)}`
+                    : stats.state === "fuera"
                     ? "cerrado"
-
                     : "en curso"
                 }
 
               </small>
-          }
 
+          }
 
         </div>
 
-
       </button>
-
 
 
       {
         expanded && (
 
           <div className="day-detail">
-
 
             {
               missingExit && (
@@ -1921,57 +2223,65 @@ function DayCard({
             }
 
 
-
             <div className="detail-stats">
+
+              <Stat
+                label="Total trabajado"
+                value={
+                  formatDuration(
+                    stats.workedMs
+                  )
+                }
+                small
+              />
 
 
               <Stat
+                label="Horas extras"
+                value={
+                  displayExtra === null
+                    ? "—"
+                    : formatDuration(
+                        displayExtra
+                      )
+                }
+                small
+              />
 
+
+              <Stat
                 label="Descansos"
-
                 value={
                   formatDuration(
                     stats.breakMs
                   )
                 }
-
                 small
-
               />
 
 
               <Stat
-
                 label="Baño"
-
                 value={
                   formatDuration(
                     stats.bathMs
                   )
                 }
-
                 small
-
               />
 
 
               <Stat
-
                 label="Otro"
-
                 value={
                   formatDuration(
                     stats.otherMs
                   )
                 }
-
                 small
-
               />
 
-
             </div>
-
 
 
             {
@@ -1986,18 +2296,14 @@ function DayCard({
                 :
 
                 <small>
-
                   Sin marcajes.
-
                 </small>
             }
-
 
           </div>
 
         )
       }
-
 
     </article>
 
@@ -2006,13 +2312,11 @@ function DayCard({
 }
 
 
-
 createRoot(
   document.getElementById("root")
 ).render(
   <App/>
 );
-
 
 
 if ("serviceWorker" in navigator) {
