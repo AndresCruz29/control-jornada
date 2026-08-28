@@ -1,67 +1,91 @@
-const CACHE_NAME = "control-jornada-v5";
+const CACHE_NAME = "control-jornada-v11";
 const BASE = "/control-jornada/";
 
-self.addEventListener("install", (event) => {
+const APP_SHELL = [
+  BASE,
+  BASE + "index.html",
+  BASE + "manifest.webmanifest"
+];
+
+self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) =>
-      cache.addAll([
-        BASE,
-        BASE + "index.html",
-        BASE + "manifest.webmanifest"
-      ])
-    )
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(APP_SHELL))
   );
 
   self.skipWaiting();
 });
 
-self.addEventListener("activate", (event) => {
+
+self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then((keys) =>
+    caches.keys().then(keys =>
       Promise.all(
         keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
+          .filter(key => key !== CACHE_NAME)
+          .map(key => caches.delete(key))
       )
-    )
+    ).then(() => self.clients.claim())
   );
-
-  self.clients.claim();
 });
 
-self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
+
+self.addEventListener("fetch", event => {
+
+  if (event.request.method !== "GET") {
+    return;
+  }
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
 
-      return fetch(event.request)
-        .then((response) => {
-          if (
-            response &&
-            response.status === 200 &&
-            response.type === "basic"
-          ) {
-            const copy = response.clone();
+    fetch(event.request)
+      .then(response => {
 
-            caches.open(CACHE_NAME).then((cache) => {
+        if (
+          response &&
+          response.status === 200
+        ) {
+
+          const copy = response.clone();
+
+          caches.open(CACHE_NAME)
+            .then(cache => {
               cache.put(event.request, copy);
             });
-          }
 
-          return response;
-        })
-        .catch(() => {
-          if (event.request.mode === "navigate") {
-            return caches.match(BASE + "index.html");
-          }
+        }
 
-          return new Response("", {
-            status: 503,
-            statusText: "Offline"
+        return response;
+
+      })
+
+      .catch(() => {
+
+        return caches.match(event.request)
+          .then(cached => {
+
+            if (cached) {
+              return cached;
+            }
+
+            if (event.request.mode === "navigate") {
+              return caches.match(
+                BASE + "index.html"
+              );
+            }
+
+            return new Response(
+              "Offline",
+              {
+                status: 503,
+                statusText: "Offline"
+              }
+            );
+
           });
-        });
-    })
+
+      })
+
   );
+
 });
