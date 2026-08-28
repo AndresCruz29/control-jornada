@@ -797,13 +797,22 @@ function exportQuincena(quincena) {
     const schedule =
       getSchedule(lbl.dt);
 
-    const stats =
-      computeStats(
-        events,
-        endOfDayTs(dateStr),
-        dateStr
-      );
+const isToday =
+  dateStr === dateStrOf(new Date());
 
+
+const calculationEndTs =
+  isToday
+    ? Date.now()
+    : endOfDayTs(dateStr);
+
+
+const stats =
+  computeStats(
+    events,
+    calculationEndTs,
+    dateStr
+  );
 
     const missingExit =
       events.length > 0 &&
@@ -837,34 +846,70 @@ function exportQuincena(quincena) {
     }
 
 
-    resumenRows.push({
-      Fecha: `${pad(lbl.dt.getDate())}/${pad(lbl.dt.getMonth() + 1)}/${lbl.dt.getFullYear()}`,
-      Día: lbl.dow,
-      Entrada: formatClockShort(stats.entradaTs),
-      Salida: formatClockShort(stats.salidaTs),
-      "Total trabajado": events.length ? formatDuration(stats.workedMs) : "—",
-      "Horas extras": missingExit ? "—" : formatDuration(stats.extraMs),
-      Descanso: events.length ? formatDuration(stats.breakMs) : "—",
-      Baño: events.length ? formatDuration(stats.bathMs) : "—",
-      Otro: events.length ? formatDuration(stats.otherMs) : "—",
-      Estado: estado
-    });
+resumenRows.push({
+  Fecha: `${pad(lbl.dt.getDate())}/${pad(lbl.dt.getMonth() + 1)}/${lbl.dt.getFullYear()}`,
+  Día: lbl.dow,
 
+  Entrada:
+    stats.entradaTs !== null
+      ? formatClockShort(stats.entradaTs)
+      : "—",
 
-    if (!missingExit) {
+  Salida:
+    stats.salidaTs !== null
+      ? formatClockShort(stats.salidaTs)
+      : "—",
 
-      totalWorked +=
-        stats.workedMs;
+  "Total trabajado":
+    missingExit
+      ? "—"
+      : events.length
+      ? formatDuration(stats.workedMs)
+      : "—",
 
-      totalExtra +=
-        stats.extraMs;
+  "Horas extras":
+    missingExit
+      ? "—"
+      : events.length
+      ? formatDuration(stats.extraMs)
+      : "—",
 
-    }
+  Descanso:
+    missingExit
+      ? "—"
+      : events.length
+      ? formatDuration(stats.breakMs)
+      : "—",
 
+  Baño:
+    missingExit
+      ? "—"
+      : events.length
+      ? formatDuration(stats.bathMs)
+      : "—",
 
-    totalBreak +=
-      stats.breakMs;
+  Otro:
+    missingExit
+      ? "—"
+      : events.length
+      ? formatDuration(stats.otherMs)
+      : "—",
 
+  Estado: estado
+});
+
+if (!missingExit) {
+
+  totalWorked +=
+    stats.workedMs;
+
+  totalExtra +=
+    stats.extraMs;
+
+  totalBreak +=
+    stats.breakMs;
+
+}
 
     for (const ev of stats.events) {
 
