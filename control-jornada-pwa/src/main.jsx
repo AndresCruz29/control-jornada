@@ -2321,15 +2321,56 @@ createRoot(
 
 if ("serviceWorker" in navigator) {
 
-  window.addEventListener(
-    "load",
-    () => {
+  window.addEventListener("load", async () => {
 
-      navigator.serviceWorker.register(
-        "/control-jornada/sw.js"
+    try {
+
+      const registration =
+        await navigator.serviceWorker.register(
+          "/control-jornada/sw.js"
+        );
+
+      await registration.update();
+
+      registration.addEventListener(
+        "updatefound",
+        () => {
+
+          const newWorker =
+            registration.installing;
+
+          if (!newWorker) return;
+
+          newWorker.addEventListener(
+            "statechange",
+            () => {
+
+              if (
+                newWorker.state === "installed" &&
+                navigator.serviceWorker.controller
+              ) {
+
+                window.location.reload();
+
+              }
+
+            }
+          );
+
+        }
       );
 
     }
-  );
+
+    catch (error) {
+
+      console.error(
+        "Error actualizando la aplicación:",
+        error
+      );
+
+    }
+
+  });
 
 }
